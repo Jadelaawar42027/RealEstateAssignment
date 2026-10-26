@@ -1,9 +1,8 @@
 # Real Estate Application (OOP in Java)
 
-Computer Programming 2 – group assignment
+Computer Programming 2
 
-- Student 1 – Name: ____ / Student ID: ____
-- Student 2 – Name: ____ / Student ID: ____
+Name: Jad El Aawar / Student ID: 23389
 
 ## Compile and run
 
@@ -43,9 +42,9 @@ src/edu/uni/realestate/
 
 Dependencies point one way: `app → service → model`. No model class imports from `service` or `app`.
 
-- **Inheritance carries the property type.** `Property` (abstract) holds square feet, bedrooms, bathrooms, the id and availability. `House` and `Apartment` (both abstract) add their own fields. The four concrete classes extend `House` or `Apartment`.
+- **Inheritance carries the property type.** `Property` (abstract) holds square feet, bedrooms, bathrooms, the id and availability. `House` and `Apartment` (both abstract) add their own fields. The four concrete classes (all `final`) extend `House` or `Apartment`.
 - **Composition carries the deal type.** `HouseRental` and `ApartmentRental` each own a `private final RentalTerms terms`; `HousePurchase` and `ApartmentPurchase` each own a `PurchaseTerms`. Rental and purchase fields are written once.
-- **Encapsulation.** Every field is private and has a public getter. Every setter is private, validates its value, throws `IllegalArgumentException`, and is called only from the constructor. There are no public setters and no `setAvailable`. The only state change after creation is `close()`, which is one-way and throws `IllegalStateException` if the property is already closed.
+- **Encapsulation.** Every field is private and has a public getter. Every setter is private, validates its value, throws `IllegalArgumentException`, and is called only from the constructor. `id` is set once by `assignId()` and has no setter. There are no public setters and no `setAvailable`. The only state change after creation is `close()`, which is one-way and throws `IllegalStateException` if the property is already closed.
 - **Chained display.** Each `display()` calls `super.display()` first and then prints only its own lines; concrete classes finish with `terms.display()`. Money is printed with `%.2f`.
 - **Static `promptInit`.** Each class's `promptInit(Scanner)` calls its parent's (and its terms class's) `promptInit`, adds its own keys, and returns a `Map<String, String>`. It never creates the object. It has no `@Override` because static methods are hidden, not overridden. All console reading goes through the package-private `InputHelper` (`readInt`, `readDouble`, `readYesNo`, `readChoice`), which re-prompts until the input is valid and never crashes on non-numeric input.
 - **Agent knows no attributes.** `Agent` only calls `promptInit`, constructors, `display()`, `close()`, `isAvailable()` and `getId()`. `getProperties()` returns `Collections.unmodifiableList(properties)`.
@@ -69,9 +68,11 @@ A static `register(key, prompt, constructor)` method fills both, so they cannot 
 register("condo rental", CondoRental::promptInit, CondoRental::new);
 ```
 
-### Note on ids
+### Ids and yes/no values
 
-The provided `Property` assigns the id last, so a failed `Property` check (for example `baths=0`) does not use up an id. Subclasses call `super(data)` first, though, so if `House`, `Apartment` or a terms class rejects a value, the `Property` part has already taken an id and that number is skipped. We kept `Property` exactly as provided. A fix would be to validate the whole map before calling the constructor.
+Ids are handed out only after an object has passed every check. The provided `Property` gave out the id at the end of its own constructor, but subclass constructors run after `super(data)`. So if `House`, `Apartment` or a terms class rejected a value, the id was already used and that number was skipped. Now `Property` has a `protected final assignId()` method, and each concrete class calls it as the last line of its constructor, after `super(data)` and after its terms object has been created. A rejected object never takes an id (the AgentDemo output shows the next valid property gets #5). The four concrete classes are `final`, so nothing can extend them and skip this step.
+
+Yes/no map values are strict. `Property.parseYesNo` (package-private, so only model classes use it) returns true for "yes" and false for "no" (any case), and throws `IllegalArgumentException` for anything else, including a missing key. `House`, `Apartment` and `RentalTerms` use it for `fenced`, `balcony` and `furnished`.
 
 ## AgentDemo output
 
@@ -128,13 +129,16 @@ Rejected beds=-1 (ApartmentRental): Bedrooms cannot be negative
 Rejected baths=0 (HouseRental): Bathrooms must be at least 1
 Rejected stories=0 (HousePurchase): Stories must be at least 1
 Rejected garage="garage" (HousePurchase): Garage must be attached, detached or none (got "garage")
+Rejected fenced="maybe" (HouseRental): Fenced yard must be yes or no
+Rejected balcony missing (ApartmentRental): Balcony must be yes or no
 Rejected laundry missing (ApartmentPurchase): Laundry type is required
 Rejected rent=-5 (ApartmentRental): Monthly rent must be greater than 0
+Rejected furnished="sort of" (ApartmentRental): Furnished must be yes or no
 Rejected utilities="   " (HouseRental): Utilities description cannot be blank
 Rejected price=0 (ApartmentPurchase): Price must be greater than 0
 Rejected taxes=-100 (HousePurchase): Annual taxes cannot be negative
 Rejected sqft="abc" (HouseRental): For input string: "abc"
-Properties held by the agent: 4
+After all the rejected objects, the next valid property gets id #5, so no ids were skipped.
 
 ===== (b) Closing a property twice is rejected =====
 closeDeal(1)  first time  -> true
@@ -144,7 +148,7 @@ closeDeal(99) unknown id  -> false
 Calling close() directly again throws IllegalStateException: Property #1 is already RENTED
 
 ===== (c) Closed properties leave the available list but stay in the full list =====
-countAvailable() = 2  (was 4)
+countAvailable() = 3 out of 5
 
 --- displayProperties(false): available only ---
 PROPERTY #2 [AVAILABLE]
@@ -166,6 +170,17 @@ PROPERTY #3 [AVAILABLE]
   Monthly rent: 950.00 EUR
   Furnished:    yes
   Utilities:    included
+
+PROPERTY #5 [AVAILABLE]
+  Square feet: 1400
+  Bedrooms:    3
+  Bathrooms:   2
+  Stories:     2
+  Garage:      ATTACHED
+  Fenced yard: yes
+  Monthly rent: 1850.00 EUR
+  Furnished:    no
+  Utilities:    about 120 EUR/month
 
 --- displayProperties(true): all ---
 PROPERTY #1 [RENTED]
@@ -208,8 +223,19 @@ PROPERTY #4 [SOLD]
   Price:        180000.00 EUR
   Annual taxes: 1500.00 EUR
 
+PROPERTY #5 [AVAILABLE]
+  Square feet: 1400
+  Bedrooms:    3
+  Bathrooms:   2
+  Stories:     2
+  Garage:      ATTACHED
+  Fenced yard: yes
+  Monthly rent: 1850.00 EUR
+  Furnished:    no
+  Utilities:    about 120 EUR/month
+
 ===== (d) getProperties() is read-only =====
-getProperties().clear() throws UnsupportedOperationException; size is still 4
+getProperties().clear() throws UnsupportedOperationException, size is still 5
 ```
 
 ## Reflection
